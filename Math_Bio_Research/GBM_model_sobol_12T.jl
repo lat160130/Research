@@ -3,15 +3,29 @@
 
 
 
-# -- Load Packages ---------------------------------------------------------- LP
+# -- Load Packages ------------------------------------------------------------- LoadPackage
 using GlobalSensitivity, Statistics, OrdinaryDiffEq, QuasiMonteCarlo, Plots
 using SciMLBase: EnsembleProblem, EnsembleThreads
 using DiffEqGPU, CUDA, OrdinaryDiffEqCore, StaticArrays
-# ------------------------------------------------------------------------------ LP
+# ------------------------------------------------------------------------------ LoadPackage
 
-# -- Cite Packages ------------------------------------------------------------- CP
+# -- Cite Packages ------------------------------------------------------------- CitePackage
 # https://github.com/SciML/DiffEqGPU.jl - using diffeq gpu
 # https://docs.sciml.ai/GlobalSensitivity/stable/ -- using Global sensitivity
-# ------------------------------------------------------------------------------ CP
+# ------------------------------------------------------------------------------ CitePackage
+
+
+# -- Create Function to solve the system of ODEs ------------------------------- FsolODE
+# function f_flux_model(dX, X, alpha, beta, k)
+# Inputs:
+
+# Outputs:
+
+
+# ------------------------------------------------------------------------------ FsolODE
+
+# -- Initial Variables --------------------------------------------------------- InitVar
+tspan = (0.0, 10.0)
+# ------------------------------------------------------------------------------ InitVar
 
 
