@@ -31,7 +31,12 @@ problem = {
 }
 d = problem["num_vars"]
 N = 2**12
-tout = np.linspace(0, 80, 81)
+tout = np.linspace(0, 80, 81)   # times at which y(t) is recorded and indices computed
+
+# Labels only: set to your units. k1, k2 are rates in 1/TIME_UNIT.
+TIME_UNIT = "time units"         # e.g. "h" or "min"
+OBS = "y"                        # which output is analyzed below
+OBS_UNIT = "dimensionless"       # unit of x and y (e.g. "fraction labeled")
 
 # ---- 2. Sample: N*(2d+2) rows when calc_second_order=True ----------------
 X = sobol_sample.sample(problem, N, calc_second_order=True, seed=1)
@@ -63,42 +68,60 @@ def indices_over_time(Y):
         S1.append(r["S1"]); ST.append(r["ST"]); S2.append(r["S2"])
     return np.array(S1), np.array(ST), np.array(S2)   # S2: time x d x d (upper triangle)
 
-S1, ST, S2 = indices_over_time(Yy)   # use Yx for the x observable
+Y = Yy if OBS == "y" else Yx
+S1, ST, S2 = indices_over_time(Y)
 t = tout[1:]
 names = problem["names"]
+xlab = f"Time t ({TIME_UNIT})"
 
 # ---- 5. Plot ------------------------------------------------------------
-fig, ax = plt.subplots(1, 3, figsize=(15, 4), sharey=True)
-ax[0].plot(t, S1); ax[0].set_title("First order $S_i$")
-ax[1].plot(t, ST); ax[1].set_title("Total order $S_{T_i}$")
+# Panel 1: the output itself across all parameter samples (what gets decomposed)
+# Panels 2-4: each index = share of Var[y(t)] at that time, so 0..1, no units
+fig, ax = plt.subplots(1, 4, figsize=(20, 4.5))
+
+q = np.percentile(Y[:, 1:], [5, 25, 50, 75, 95], axis=0)
+ax[0].fill_between(t, q[0], q[4], alpha=0.25, label="5-95%")
+ax[0].fill_between(t, q[1], q[3], alpha=0.45, label="25-75%")
+ax[0].plot(t, q[2], lw=1.5, label="median")
+ax[0].set_title(f"Spread of {OBS}(t) over the prior")
+ax[0].set_ylabel(f"{OBS}(t)  ({OBS_UNIT})")
+ax[0].legend(fontsize=8, loc="upper left")
+
+ax[1].plot(t, S1)
+ax[1].set_title("First order $S_i(t)$: parameter alone")
+ax[2].plot(t, ST)
+ax[2].set_title("Total order $S_{T_i}(t)$: alone + all interactions")
 for i in range(d):
     for j in range(i + 1, d):
-        ax[2].plot(t, S2[:, i, j], label=f"{names[i]} x {names[j]}")
-ax[2].set_title("Second order $S_{ij}$")
-ax[0].legend(names); ax[2].legend(fontsize=7)
+        ax[3].plot(t, S2[:, i, j], label=f"{names[i]} x {names[j]}")
+ax[3].set_title("Second order $S_{ij}(t)$: pair interaction only")
+ax[1].legend(names, fontsize=8); ax[3].legend(fontsize=7)
+
+for a in ax[1:]:
+    a.set_ylim(-0.05, 1)
+    a.set_ylabel(f"Fraction of Var[{OBS}(t)]  (unitless)")
+    a.axhline(0, color="gray", lw=0.5)
 for a in ax:
-    a.set_xlabel("t"); a.axhline(0, color="gray", lw=0.5)
+    a.set_xlabel(xlab)
 plt.tight_layout()
-plt.savefig("sobol_GMT_y.png", dpi=150)
+plt.savefig(f"sobol_GMT_{OBS}.png", dpi=150)
 
 # Heatmap at one time: diagonal = S_i, off-diagonal = S_ij
 k = np.argmin(np.abs(t - 36))
 M = np.nan_to_num(S2[k]); M = M + M.T + np.diag(S1[k])
-fig, a = plt.subplots(figsize=(5, 4))
+fig, a = plt.subplots(figsize=(6, 4.8))
 im = a.imshow(M, vmin=0, vmax=1, cmap="viridis")
 a.set_xticks(range(d), names); a.set_yticks(range(d), names)
+a.set_xlabel("Parameter j"); a.set_ylabel("Parameter i")
 for i in range(d):
     for j in range(d):
         a.text(j, i, f"{M[i, j]:.2f}", ha="center", va="center", color="w", fontsize=8)
-fig.colorbar(im); a.set_title(f"y at t = {t[k]:g}")
+cb = fig.colorbar(im)
+cb.set_label(f"Fraction of Var[{OBS}(t)]  (unitless)")
+a.set_title(f"{OBS} at t = {t[k]:g} {TIME_UNIT}\n"
+            "diagonal: $S_i$   off-diagonal: $S_{ij}$", fontsize=10)
 plt.tight_layout()
-plt.savefig("sobol_GMT_y_heatmap.png", dpi=150)
+plt.savefig(f"sobol_GMT_{OBS}_heatmap.png", dpi=150)
 
 print(f"t = {t[k]:g}:  sum S1 + sum S2 = {S1[k].sum() + np.nansum(S2[k]):.3f}")
 plt.show()
-
-
-
-
-
-
