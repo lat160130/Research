@@ -3,7 +3,9 @@
 
 
 
+
 # -- Load Packages ------------------------------------------------------------- LoadPackage
+using Pkg; Pkg.activate(joinpath(@__DIR__, ".."))
 using GlobalSensitivity, Statistics, OrdinaryDiffEq, QuasiMonteCarlo, Plots
 using SciMLBase: EnsembleProblem, EnsembleThreads
 using DiffEqGPU, CUDA, OrdinaryDiffEqCore, StaticArrays
