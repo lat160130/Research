@@ -1,102 +1,108 @@
-# -- Calculate the First, Second, and Total order sobol Indicies for the 
-# -- Guppy Mitchell Taylor (GMT) labeled/unlabeled flux model.
-
-
-
+# -- Calculate the First, Second, and Total order Sobol indices for the
+# -- Guppy Mitchell Taylor (GMT) labeled/unlabeled flux model (CPU, threaded).
 
 # -- Load Packages ------------------------------------------------------------- LoadPackage
 using Pkg; Pkg.activate(joinpath(@__DIR__, ".."))
-using LinearAlgebra
-using GlobalSensitivity, Statistics, OrdinaryDiffEq, QuasiMonteCarlo
-using SciMLBase: EnsembleProblem, EnsembleThreads
-using DiffEqGPU, CUDA, OrdinaryDiffEqCore, StaticArrays
-using Plots, StatsPlots, LaTeXStrings, CairoMakie
+using LinearAlgebra, Statistics
+using OrdinaryDiffEq, SciMLBase, GlobalSensitivity, QuasiMonteCarlo, StaticArrays
+using Plots, StatsPlots
 # ------------------------------------------------------------------------------ LoadPackage
 
 # -- Cite Packages ------------------------------------------------------------- CitePackage
-# https://github.com/SciML/DiffEqGPU.jl - using diffeq gpu
-# https://docs.sciml.ai/GlobalSensitivity/stable/ -- using Global sensitivity
+# https://docs.sciml.ai/GlobalSensitivity/stable/
+# https://docs.sciml.ai/DiffEqDocs/stable/features/ensemble/
 # ------------------------------------------------------------------------------ CitePackage
 
-#= FIX THIS LATER FOR NxN system of ODES
-# -- Create Function to solve the system of ODEs ------------------------------- FsolODE
-function f_flux_model!(dU, U, p, t)
-# Inputs: 
-# X - vector of N metabolites and their concentrations
-# K - diagonal matrix of k_i 
-# p -   
+println("Running with $(Threads.nthreads()) threads")
 
-
-# Outputs:
-# dX - this is a "vertical vector" of dX/dt - the left handside of equation (16)
-# of https://link.springer.com/article/10.1007/s11538-024-01386-x
-
-# Equation 16: dX = K*A*X + alpha
-# Where A is a 2x2 matrix: (recall in Julia, array indexing starts at 1 by default)
-# [-1,           beta12]
-# [1 - alpha(2),     -1]
-
-# define matrix A
-A = [-1 beta12; (1- alpha(2)) -1]
-dU = K*A*X + alpha
-
-end 
-# ------------------------------------------------------------------------------ FsolODE
-=#
-
-
-
-function f!(du, u, p, t)
-    du[1] = k1 * (-u[1]           + p[3]*u[2] + u[1])
-    du[2] = k2 * ((1 - p[2])*u[1] - u[2]      + u[2])
-
+# -- Model, Eq. (16): dU = K*A*U + alpha ---------------------------------------- Model
+function f(u, p, t)
+    alpha1, alpha2, beta12, k1, k2 = p
+    du1 = k1 * (-u[1] + beta12*u[2]      + alpha1)
+    du2 = k2 * ((1 - alpha2)*u[1] - u[2] + alpha2)
+    return SVector{2}(du1, du2)
 end
+# ------------------------------------------------------------------------------ Model
 
 # -- Initial Variables --------------------------------------------------------- InitVar
-tspan = (0.0, 80)
-#=
-X0 = [1.0; 1.0] # starting concentrations for 
-K = [1 0; 0 1] # K11 = k1, K22 = k2 in equation 16.
-alpha = [3 3];
-=#
-
-
-alpha1 = 3
-alpha2 = 3
-beta12 = 1
-k1     = 1
-k2     = 1
-p = [alpha1; alpha2; beta12; k1; k2]
-u0 = [1.0; 1.0]
-
+param_names  = ["alpha1", "alpha2", "beta12", "k1", "k2"]
+output_names = ["mean U1", "mean U2"]
+p_nominal    = @SVector [3.0, 3.0, 1.0, 1.0, 1.0]
+u0           = @SVector [1.0,1.0]
+prob         = ODEProblem{false}(f, u0, (0.0, 80.0), p_nominal)
 # ------------------------------------------------------------------------------ InitVar
 
-prob = ODEProblem(f!, u0, tspan, p)
-t = collect(range(0, stop = 10, length = 200))
+# -- Single trajectory and plot ------------------------------------------------ PlotODE
+sol = solve(prob, Tsit5())
+fig_ode = plot(sol; idxs = [1, 2], lw = 2, label = ["U1(t)" "U2(t)"],
+               xlabel = "t", ylabel = "concentration", title = "GMT flux model")
+display(fig_ode)
+savefig(fig_ode, joinpath(@__DIR__, "ode_solution.png"))
+# ------------------------------------------------------------------------------ PlotODE
 
-f1 = function (p)
-    prob1 = remake(prob; p = p)
-    sol = solve(prob1, Tsit5(); saveat = t)
-    return [mean(sol[1, :]), maximum(sol[2, :])]
+# -- Batched quantity of interest (threaded CPU ensemble) ---------------------- QoI
+t_save   = collect(range(0.0, 10.0; length = 200))
+prob_gsa = remake(prob; tspan = (0.0, 10.0))
+
+# P is (n_params x n_samples); returns (n_outputs x n_samples)
+function qoi_batch(P)
+    N = size(P, 2)
+    prob_func = (pr, ctx) ->
+        remake(pr; p = SVector{5, Float64}(ntuple(j -> P[j, ctx.sim_id], 5)))
+    ens = EnsembleProblem(prob_gsa; prob_func = prob_func, safetycopy = false)
+    sim = solve(ens, Tsit5(), EnsembleThreads(); trajectories = N, saveat = t_save)
+
+    nfail = count(s -> !SciMLBase.successful_retcode(s), sim.u)
+    nfail > 0 && @warn "$nfail of $N trajectories failed"
+
+    out = Matrix{Float64}(undef, 2, N)
+    for i in 1:N
+        u = sim.u[i].u
+        out[1, i] = mean(x[1] for x in u)
+        out[2, i] = mean(x[2] for x in u)
+    end
+    return out
 end
+# ------------------------------------------------------------------------------ QoI
 
-bounds = [[1.0, 5.0], [1.0, 5.0], [1.0, 5.0], [1.0, 5.0]]
+lb = fill(1.0, 5)
+ub = fill(5.0, 5)
 
-reg_sens = gsa(f1, RegressionGSA(true), bounds, samples = 200)
-fig = Figure(resolution = (600, 400))
-ax,
-hm = CairoMakie.heatmap(fig[1, 1],
-    reg_sens.partial_correlation,
-    axis = (xticksvisible = false, yticksvisible = false, yticklabelsvisible = false,
-        xticklabelsvisible = false, title = "Partial correlation"))
-Colorbar(fig[1, 2], hm)
-ax,
-hm = CairoMakie.heatmap(fig[2, 1],
-    reg_sens.standard_regression,
-    axis = (xticksvisible = false, yticksvisible = false, yticklabelsvisible = false,
-        xticklabelsvisible = false, title = "Standard regression"))
-Colorbar(fig[2, 2], hm)
-fig
+# -- Sanity check before GSA --------------------------------------------------- Check
+Ytest = qoi_batch(QuasiMonteCarlo.sample(500, lb, ub, SobolSample()))
+@assert size(Ytest) == (2, 500)
+@assert all(isfinite, Ytest) "non-finite outputs - check model/bounds"
+# ------------------------------------------------------------------------------ Check
 
+# -- Regression GSA ------------------------------------------------------------ RegGSA
+reg_sens = gsa(qoi_batch, RegressionGSA(true), [[lb[i], ub[i]] for i in 1:5];
+               samples = 5_000, batch = true)
 
+h1 = heatmap(param_names, output_names, reg_sens.partial_correlation;
+             title = "Partial correlation", clims = (-1, 1), c = :balance)
+h2 = heatmap(param_names, output_names, reg_sens.standard_regression;
+             title = "Standard regression", c = :balance)
+fig_reg = plot(h1, h2; layout = (2, 1), size = (650, 550))
+display(fig_reg)
+savefig(fig_reg, joinpath(@__DIR__, "gsa_regression.png"))
+# ------------------------------------------------------------------------------ RegGSA
 
+# -- Sobol GSA (first, second, total) ------------------------------------------ SobolGSA
+N_sobol = 2^12
+A, B = QuasiMonteCarlo.generate_design_matrices(N_sobol, lb, ub, SobolSample(), 2)
+sobol_sens = gsa(qoi_batch, Sobol(order = [0, 1, 2]), A, B; batch = true)
+
+S1 = clamp.(sobol_sens.S1, 0, 1)   # (n_outputs x n_params)
+ST = clamp.(sobol_sens.ST, 0, 1)
+
+bars = [groupedbar(hcat(S1[j, :], ST[j, :]); label = ["S1" "ST"],
+                   xticks = (1:5, param_names), ylims = (0, 1.05),
+                   ylabel = "Sobol index [-]", title = output_names[j])
+        for j in 1:2]
+fig_sobol = plot(bars...; layout = (2, 1), size = (700, 650))
+display(fig_sobol)
+savefig(fig_sobol, joinpath(@__DIR__, "gsa_sobol.png"))
+
+println("Second-order indices S2:")
+display(sobol_sens.S2)
+# ------------------------------------------------------------------------------ SobolGSA

@@ -291,7 +291,7 @@ uuid = "1af6417a-86b4-443c-805f-a4643ffb695f"
 version = "2.1.1"
 
 [[deps.CUDA_Runtime_jll]]
-deps = ["Artifacts", "CUDA_Compiler_jll", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
+deps = ["Artifacts", "CUDA_Compiler_jll", "CUDA_Driver_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MSVCRuntime_jll", "TOML"]
 git-tree-sha1 = "73ee54b64592c4157e7240e237a13c65049048c3"
 uuid = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"
 version = "0.25.0+1"
@@ -1738,6 +1738,12 @@ deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl",
 git-tree-sha1 = "282cadc186e7b2ae0eeadbd7a4dffed4196ae2aa"
 uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 version = "2025.2.0+0"
+
+[[deps.MSVCRuntime_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "9670d7b2dbc92652a250e88eaa80861892d453e2"
+uuid = "ce32ce21-2cee-52aa-a084-5c6dad4fa7db"
+version = "14.51.36247+0"
 
 [[deps.MacroTools]]
 git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
