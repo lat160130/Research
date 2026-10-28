@@ -57,6 +57,69 @@ end % i = 1:numMetabolites
 % -- Defining model parameters -------------------------------------------- Parameters
 kNames     = "k" + (1:numMetabolites);
 alphaNames = "alpha" + (1:numMetabolites); 
-betaNames  = "beta"  + (1:numMetabolites);
-
+betaNamesMat  = str2sym("beta_" + (1:numMetabolites)' + ...
+                            "_" + (1:numMetabolites) );
 % ------------------------------------------------------------------------- Parameters
+
+
+% WORK ON THIS!!!!!!!!!!!!
+% XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+
+% -- Nondimensional Reversible Chain Reaction Model ----------------------- nxn matrix non dimensional model
+% x1dot = k1(-x1 + beta12*x2 + alpha1)
+
+% for i = 2, ..., numMetabolites - 1
+% xidot = ki((1-alphai - betai,i+1)xi-1 - xi-1 + betai,i+1*xi+1 + alphai)
+
+% xn = kN((1-alphaN)*xN-1 - xN - alphaN);
+
+% generate the matrix 
+
+% load the parameters into the sbiomodel object
+
+% edit the bounds vector if you have more parameters to add
+% (I don't know how to adjust the bounds to NOT use a uniform distribution).
+
+
+% ------------------------------------------------------------------------- nxn matrix non dimensional model
+
+
+
+% -- Add Rules ------------------------------------------------------------ Rules
+% in "addrule" dx/dt is the LHS i.e. apply the RHS to species x's rate
+% (dx/dt)
+
+
+% Example for the toy two metabolite system.
+% addrule(GMT_Model, 'x = k1*(-x + b12*y + alpha1)',      'RuleType', 'rate');
+% addrule(GMT_Model, 'y = k2*((1-alpha2)*x -y + alpha2)', 'RuleType', 'rate');
+% The above two rules come from equation 16 in the below article.
+% https://link.springer.com/article/10.1007/s11538-024-01386-x
+
+% Use a loop for an n metabolite system O(n) time complexity
+
+% Each rule corresponds to another row in your system of differential
+% equations.
+
+% ------------------------------------------------------------------------- Rules
+
+
+
+% -- Plot the indices ---------------------------------------------------- Plot
+% The below code plots two figures.  Figure 1 shows 1st and total order
+% sobol indices OVER TIME for each of the (in this code) 5 parameters that are in the
+% system of ODEs.
+% Figure 2 shows the sobol index as a bar graph.  "Darker colors mean that those values occur
+% more often over the whole time course."
+% See the following link for more: https://www.mathworks.com/help/simbio/ref/sbiosobol.html#d127e21583
+% Do a cntrl-f of the following "Plot the time course of the first- and
+% total-order Sobol indices." to read more on what the plots are saying
+% exactly.
+res = sbiosobol(GMT_Model, parameterNames, {'x','y'}, ...
+      'Bounds', bounds, 'NumberSamples', 2^12, ...
+      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel',true);
+plot(res);
+bar(res);
+res.SobolIndices;
+% ------------------------------------------------------------------------- Plot
