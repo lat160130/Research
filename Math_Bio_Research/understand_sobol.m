@@ -108,7 +108,7 @@ addrule(GMT_Model, 'y = k2*((1-alpha2)*x -y + alpha2)', 'RuleType', 'rate');
 % exactly.
 res = sbiosobol(GMT_Model, parameterNames, {'x','y'}, ...
       'Bounds', bounds, 'NumberSamples', 2^12, ...
-      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel',true);
+      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel',true, 'Accelerate',true);
 plot(res);
 bar(res);
 res.SobolIndices;

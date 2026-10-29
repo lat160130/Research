@@ -16,6 +16,8 @@ close all;
 % This script is standalone and can be run on its own.
 % ------------------------------------------------------------------------- IN
 
+% -- Set up Profiler ------------------------------------------------------ Profiler
+% ------------------------------------------------------------------------- Profiler
 % -- Set up Sim Biology Model --------------------------------------------- SBM
 GMT_Model_Name = "Guppy-Mitchell-Taylor";
 GMT_Model = sbiomodel(GMT_Model_Name); % this declares a "sim biology" object
@@ -149,6 +151,17 @@ addrule(GMT_Model, sprintf( ...
 % https://link.springer.com/article/10.1007/s11538-024-01386-x
 % ------------------------------------------------------------------------- Rules
 
+% -- Profile and Calculate Sobol Indices ---------------------------------- Profile and Calculate
+
+% Cost warning: sbiosobol runs (3N-1 + 2) * NumberSamples simulations.
+% N = 2 -> 7*4096 = 28,672.  N = 5 -> 16*4096 = 65,536.  Drop NumberSamples
+% to 2^10 while you are testing a larger N.
+
+res = sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), ...
+      'Bounds', bounds, 'NumberSamples', 2^12, ...
+      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel', true, Accelerate=true);
+
+% ------------------------------------------------------------------------- Profile and Calculate
 
 % -- Plot the indices ----------------------------------------------------- Plot
 % The below code plots two figures.  Figure 1 shows 1st and total order
@@ -161,13 +174,7 @@ addrule(GMT_Model, sprintf( ...
 % total-order Sobol indices." to read more on what the plots are saying
 % exactly.
 
-% Cost warning: sbiosobol runs (3N-1 + 2) * NumberSamples simulations.
-% N = 2 -> 7*4096 = 28,672.  N = 5 -> 16*4096 = 65,536.  Drop NumberSamples
-% to 2^10 while you are testing a larger N.
 
-res = sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), ...
-      'Bounds', bounds, 'NumberSamples', 2^12, ...
-      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel', true);
 plot(res);
 bar(res);
 res.SobolIndices;

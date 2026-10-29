@@ -16,13 +16,15 @@ close all;
 % This script is standalone and can be run on its own.
 % ------------------------------------------------------------------------- IN
 
+% -- Set up Profiler ------------------------------------------------------ Profiler
+% ------------------------------------------------------------------------- Profiler
 % -- Set up Sim Biology Model --------------------------------------------- SBM
 GMT_Model_Name = "Guppy-Mitchell-Taylor";
 GMT_Model = sbiomodel(GMT_Model_Name); % this declares a "sim biology" object
 % ------------------------------------------------------------------------- SBM
 
 % -- Variable Set Up ------------------------------------------------------ VSU
-N = 3;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
+N = 5;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
         %     N = 2 reproduces your original Equation 16 script exactly.
         %     N > 2 is Equation 20, the reversible chain reaction model.
 
@@ -149,6 +151,32 @@ addrule(GMT_Model, sprintf( ...
 % https://link.springer.com/article/10.1007/s11538-024-01386-x
 % ------------------------------------------------------------------------- Rules
 
+% -- Profile and Calculate Sobol Indices ---------------------------------- Profile and Calculate
+
+% Cost warning: sbiosobol runs (3N-1 + 2) * NumberSamples simulations.
+% N = 2 -> 7*4096 = 28,672.  N = 5 -> 16*4096 = 65,536.  Drop NumberSamples
+% to 2^10 while you are testing a larger N.
+N = 2^12;
+
+% -- WARMUP - model compilation on workers, not timed. -- V
+sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), NumberSamples=20, UseParallel=true);
+% -- WARMUP --------------------------------------------- ^
+t = tic; % measure computation time
+res = sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), ...
+      'Bounds', bounds, 'NumberSamples', N, ...
+      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel', true, Accelerate=true);
+tSobol = toc(t);
+fprintf('Sobol computation time (12 workers): %.1f s\n', tSobol);
+
+% RAM used by each worker (Windows only)
+if ispc
+    f = parfevalOnAll(@memory, 1);
+    m = fetchOutputs(f);
+    wGB = [m.MemUsedMATLAB]'/1e9;
+    fprintf('Per-worker RAM: mean %.2f GB, max %.2f GB, total %.2f GB\n', ...
+        mean(wGB), max(wGB), sum(wGB));
+end
+% ------------------------------------------------------------------------- Profile and Calculate
 
 % -- Plot the indices ----------------------------------------------------- Plot
 % The below code plots two figures.  Figure 1 shows 1st and total order
@@ -161,14 +189,8 @@ addrule(GMT_Model, sprintf( ...
 % total-order Sobol indices." to read more on what the plots are saying
 % exactly.
 
-% Cost warning: sbiosobol runs (3N-1 + 2) * NumberSamples simulations.
-% N = 2 -> 7*4096 = 28,672.  N = 5 -> 16*4096 = 65,536.  Drop NumberSamples
-% to 2^10 while you are testing a larger N.
 
-res = sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), ...
-      'Bounds', bounds, 'NumberSamples', 2^12, ...
-      'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel', true);
-plot(res);
-bar(res);
+% plot(res); % plots the individual fractions
+bar(res); % plots time integrated first and total order indices, bar chart
 res.SobolIndices;
 % ------------------------------------------------------------------------- Plot
