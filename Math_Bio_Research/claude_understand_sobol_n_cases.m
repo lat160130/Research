@@ -24,7 +24,7 @@ GMT_Model = sbiomodel(GMT_Model_Name); % this declares a "sim biology" object
 % ------------------------------------------------------------------------- SBM
 
 % -- Variable Set Up ------------------------------------------------------ VSU
-N = 5;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
+N = 3;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
         %     N = 2 reproduces your original Equation 16 script exactly.
         %     N > 2 is Equation 20, the reversible chain reaction model.
 

@@ -1,8 +1,4 @@
-% -- Clear Model ---------------------------------------------------------- CM
-clc;
-clear;
-close all;
-% ------------------------------------------------------------------------- CM
+function [m] = calc_sobol_time2(n)
 
 % -- Installation notes --------------------------------------------------- IN
 % To run this code the following toolboxes are required:
@@ -24,7 +20,7 @@ GMT_Model = sbiomodel(GMT_Model_Name); % this declares a "sim biology" object
 % ------------------------------------------------------------------------- SBM
 
 % -- Variable Set Up ------------------------------------------------------ VSU
-N = 3;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
+N = n;  % <-- NUMBER OF SPECIES.  Set this to whatever integer you want (N >= 2).
         %     N = 2 reproduces your original Equation 16 script exactly.
         %     N > 2 is Equation 20, the reversible chain reaction model.
 
@@ -156,26 +152,27 @@ addrule(GMT_Model, sprintf( ...
 % Cost warning: sbiosobol runs (3N-1 + 2) * NumberSamples simulations.
 % N = 2 -> 7*4096 = 28,672.  N = 5 -> 16*4096 = 65,536.  Drop NumberSamples
 % to 2^10 while you are testing a larger N.
+N = 2^12;
 
+% -- WARMUP - model compilation on workers, not timed. -- V
+sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), NumberSamples=20, UseParallel=true);
+% -- WARMUP --------------------------------------------- ^
+t = tic; % measure computation time
 res = sbiosobol(GMT_Model, cellstr(parameterNames), cellstr(speciesNames), ...
-      'Bounds', bounds, 'NumberSamples', 2^12, ...
+      'Bounds', bounds, 'NumberSamples', N, ...
       'OutputTimes', linspace(0,80,81), 'ShowWaitbar', true, 'UseParallel', true, Accelerate=true);
+tSobol = toc(t);
+fprintf('Sobol computation time (12 workers): %.1f s\n', tSobol);
 
+% RAM used by each worker (Windows only)
+if ispc
+    f = parfevalOnAll(@memory, 1);
+    m = fetchOutputs(f);
+    wGB = [m.MemUsedMATLAB]'/1e9;
+    fprintf('Per-worker RAM: mean %.2f GB, max %.2f GB, total %.2f GB\n', ...
+        mean(wGB), max(wGB), sum(wGB));
+end
 % ------------------------------------------------------------------------- Profile and Calculate
 
-% -- Plot the indices ----------------------------------------------------- Plot
-% The below code plots two figures.  Figure 1 shows 1st and total order
-% sobol indices OVER TIME for each of the 3N-1 parameters that are in the
-% system of ODEs.
-% Figure 2 shows the sobol index as a bar graph.  "Darker colors mean that
-% those values occur more often over the whole time course."
-% See the following link for more: https://www.mathworks.com/help/simbio/ref/sbiosobol.html#d127e21583
-% Do a cntrl-f of the following "Plot the time course of the first- and
-% total-order Sobol indices." to read more on what the plots are saying
-% exactly.
+end
 
-
-plot(res);
-bar(res);
-res.SobolIndices;
-% ------------------------------------------------------------------------- Plot
